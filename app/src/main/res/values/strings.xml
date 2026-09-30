@@ -1,0 +1,7 @@
+<resources>
+    <string name="app_name">Turbo Drive 3D</string>
+    <string name="notification_channel_name">سباقات وتحديات Turbo Drive</string>
+    <string name="notification_channel_desc">إشعارات الوصول إلى خط النهاية والإنجازات</string>
+    <string name="finish_notification_title">🏆 وصلت إلى خط النهاية!</string>
+    <string name="finish_notification_desc">تهانينا! لقد أكملت سباق %1$s بنجاح في زمن %2$s!</string>
+</resources>

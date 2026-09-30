@@ -1,0 +1,8 @@
+{
+  "name": "Remix Turbo Drive 3D",
+  "description": "لعبة سباق سيارات ثلاثية الأبعاد مثيرة مع أوضاع لعب متعددة وتحديات وحواجز حتى خط النهاية وإشعارات عند الفوز.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
