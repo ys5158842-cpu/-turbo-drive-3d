@@ -16,6 +16,20 @@ class GamePreferences(context: Context) {
     private val _selectedCarId = MutableStateFlow(getSavedCarId())
     val selectedCarId: Flow<String> = _selectedCarId.asStateFlow()
 
+    private val _playerName = MutableStateFlow(getSavedPlayerName())
+    val playerName: Flow<String> = _playerName.asStateFlow()
+
+    fun getPlayerName(): String = getSavedPlayerName()
+
+    private fun getSavedPlayerName(): String =
+        prefs.getString(KEY_PLAYER_NAME, "كابتن السرعة") ?: "كابتن السرعة"
+
+    fun setPlayerName(name: String) {
+        val trimmed = name.trim().ifEmpty { "كابتن السرعة" }
+        prefs.edit().putString(KEY_PLAYER_NAME, trimmed).apply()
+        _playerName.value = trimmed
+    }
+
     fun getCoins(): Int = prefs.getInt(KEY_COINS, 100)
 
     private fun getSavedCoins(): Int = prefs.getInt(KEY_COINS, 100)
@@ -69,6 +83,7 @@ class GamePreferences(context: Context) {
     companion object {
         private const val KEY_COINS = "player_coins"
         private const val KEY_SELECTED_CAR = "selected_car_id"
+        private const val KEY_PLAYER_NAME = "pref_player_name"
         private const val KEY_SOUND = "pref_sound"
         private const val KEY_VIBRATION = "pref_vibration"
         private const val KEY_NOTIFICATIONS = "pref_notifications"

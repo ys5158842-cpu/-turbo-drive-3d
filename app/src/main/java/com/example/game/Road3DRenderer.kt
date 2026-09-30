@@ -30,8 +30,8 @@ object Road3DRenderer {
         val cameraY = track.cameraHeight
         val cameraZ = gameState.playerZ
 
-        // 1. Draw Sky & Backdrop
-        drawSky(scope, width, height, track.mode, gameState.playerX)
+        // 1. Draw Sky & Backdrop with Clouds
+        drawSky(scope, width, height, track.mode, gameState.playerX, animationTime)
 
         // 2. Project Segments
         val baseSegment = track.findSegment(cameraZ)
@@ -132,7 +132,8 @@ object Road3DRenderer {
         width: Float,
         height: Float,
         mode: GameMode,
-        playerX: Float
+        playerX: Float,
+        animationTime: Float
     ) {
         val horizonY = height * 0.45f
 
@@ -146,6 +147,9 @@ object Road3DRenderer {
             topLeft = Offset.Zero,
             size = Size(width, horizonY)
         )
+
+        // Draw animated fluffy clouds across the sky
+        drawClouds(scope, width, horizonY, mode, playerX, animationTime)
 
         // Distant silhouettes
         val panOffset = -playerX * 80f
@@ -209,6 +213,133 @@ object Road3DRenderer {
         }
     }
 
+    private data class CloudConfig(val relX: Float, val relY: Float, val scale: Float, val speed: Float)
+
+    private fun drawClouds(
+        scope: DrawScope,
+        width: Float,
+        horizonY: Float,
+        mode: GameMode,
+        playerX: Float,
+        animationTime: Float
+    ) {
+        val (cloudMain, cloudShadow, cloudRim) = when (mode.theme) {
+            TrackTheme.MOUNTAIN_NIGHT, TrackTheme.POLICE_ESCAPE -> Triple(
+                Color(0xFF475569).copy(alpha = 0.88f),
+                Color(0xFF1E293B).copy(alpha = 0.92f),
+                Color(0xFF94A3B8).copy(alpha = 0.5f)
+            )
+            TrackTheme.DESERT -> Triple(
+                Color(0xFFFFF7ED).copy(alpha = 0.92f),
+                Color(0xFFFED7AA).copy(alpha = 0.75f),
+                Color(0xFFFFFFFF).copy(alpha = 0.85f)
+            )
+            TrackTheme.CYBERPUNK -> Triple(
+                Color(0xFF381B5E).copy(alpha = 0.72f),
+                Color(0xFF1A0B2E).copy(alpha = 0.85f),
+                TurboCyan.copy(alpha = 0.45f)
+            )
+            else -> Triple(
+                Color.White.copy(alpha = 0.94f),
+                Color(0xFFCBD5E1).copy(alpha = 0.75f),
+                Color.White
+            )
+        }
+
+        val cloudList = listOf(
+            CloudConfig(0.10f, 0.20f, 1.15f, 0.45f),
+            CloudConfig(0.40f, 0.12f, 1.45f, 0.30f),
+            CloudConfig(0.72f, 0.26f, 0.95f, 0.55f),
+            CloudConfig(0.92f, 0.15f, 1.30f, 0.35f),
+            CloudConfig(0.26f, 0.34f, 0.85f, 0.65f),
+            CloudConfig(0.58f, 0.36f, 0.90f, 0.50f)
+        )
+
+        val panOffset = -playerX * 70f
+        val wrapWidth = width + 300f
+
+        for (c in cloudList) {
+            val drift = (animationTime * 12f * c.speed)
+            var cx = ((c.relX * width + drift + panOffset) % wrapWidth) - 150f
+            if (cx < -150f) cx += wrapWidth
+
+            val cy = c.relY * horizonY
+            val baseW = 115f * c.scale
+            val baseH = 44f * c.scale
+
+            drawSingleCloud(scope, cx, cy, baseW, baseH, cloudMain, cloudShadow, cloudRim)
+        }
+    }
+
+    private fun drawSingleCloud(
+        scope: DrawScope,
+        cx: Float,
+        cy: Float,
+        w: Float,
+        h: Float,
+        bodyColor: Color,
+        shadowColor: Color,
+        rimColor: Color
+    ) {
+        // Soft shaded bottom / base of cloud
+        scope.drawOval(
+            color = shadowColor,
+            topLeft = Offset(cx - w * 0.48f, cy + h * 0.05f),
+            size = Size(w * 0.96f, h * 0.62f)
+        )
+
+        // Multiple overlapping puffy circular billows
+        scope.drawCircle(
+            color = bodyColor,
+            radius = h * 0.44f,
+            center = Offset(cx - w * 0.28f, cy + h * 0.08f)
+        )
+        scope.drawCircle(
+            color = bodyColor,
+            radius = h * 0.40f,
+            center = Offset(cx + w * 0.26f, cy + h * 0.10f)
+        )
+        scope.drawCircle(
+            color = bodyColor,
+            radius = h * 0.54f,
+            center = Offset(cx - w * 0.08f, cy - h * 0.12f)
+        )
+        scope.drawCircle(
+            color = bodyColor,
+            radius = h * 0.60f,
+            center = Offset(cx + w * 0.10f, cy - h * 0.16f)
+        )
+        scope.drawCircle(
+            color = bodyColor,
+            radius = h * 0.32f,
+            center = Offset(cx - w * 0.42f, cy + h * 0.20f)
+        )
+        scope.drawCircle(
+            color = bodyColor,
+            radius = h * 0.30f,
+            center = Offset(cx + w * 0.40f, cy + h * 0.22f)
+        )
+
+        // Flat bottom cloud shelf
+        scope.drawRoundRect(
+            color = bodyColor,
+            topLeft = Offset(cx - w * 0.44f, cy - h * 0.04f),
+            size = Size(w * 0.88f, h * 0.54f),
+            cornerRadius = androidx.compose.ui.geometry.CornerRadius(h * 0.25f, h * 0.25f)
+        )
+
+        // Top highlight sunny rim
+        scope.drawArc(
+            color = rimColor.copy(alpha = 0.55f),
+            startAngle = 190f,
+            sweepAngle = 140f,
+            useCenter = false,
+            topLeft = Offset(cx - w * 0.25f, cy - h * 0.72f),
+            size = Size(w * 0.45f, h * 0.95f),
+            style = Stroke(width = 2.2f)
+        )
+    }
+
     private fun drawSegment(scope: DrawScope, seg: RoadSegment, mode: GameMode) {
         val x1 = seg.p1.screen[0]
         val y1 = seg.p1.screen[1]
@@ -222,7 +353,7 @@ object Road3DRenderer {
 
         val isOdd = (seg.index / 3) % 2 == 1
 
-        // 1. Terrain Grass/Sand
+        // 1. Background Terrain (Grass / Sand / City Outskirts)
         val grassColor = if (isOdd) mode.terrainColorLight else mode.terrainColorDark
         scope.drawRect(
             color = grassColor,
@@ -230,9 +361,79 @@ object Road3DRenderer {
             size = Size(scope.size.width, y1 - y2)
         )
 
-        // 2. Curbs / Rumble strips
+        // Curb width & Sidewalk width
         val curbW1 = w1 * 0.16f
         val curbW2 = w2 * 0.16f
+        val sidewalkW1 = w1 * 0.32f
+        val sidewalkW2 = w2 * 0.32f
+
+        // 2. Paved Sidewalk (رصيف المشاة المبلط) on both sides of the road
+        val sidewalkColor = when (mode.theme) {
+            TrackTheme.DESERT -> if (isOdd) Color(0xFFFDE68A) else Color(0xFFF59E0B)
+            TrackTheme.CYBERPUNK -> if (isOdd) Color(0xFF1E1B4B) else Color(0xFF0F0B26)
+            else -> if (isOdd) Color(0xFFE2E8F0) else Color(0xFFCBD5E1)
+        }
+
+        // Left Sidewalk
+        drawPolygon(
+            scope,
+            x1 - w1 - curbW1 - sidewalkW1, y1,
+            x1 - w1 - curbW1, y1,
+            x2 - w2 - curbW2, y2,
+            x2 - w2 - curbW2 - sidewalkW2, y2,
+            sidewalkColor
+        )
+
+        // Right Sidewalk
+        drawPolygon(
+            scope,
+            x1 + w1 + curbW1, y1,
+            x1 + w1 + curbW1 + sidewalkW1, y1,
+            x2 + w2 + curbW2 + sidewalkW2, y2,
+            x2 + w2 + curbW2, y2,
+            sidewalkColor
+        )
+
+        // Sidewalk paving tile joints (خطوط فواصل بلاط الرصيف)
+        val tileJointColor = if (mode.theme == TrackTheme.CYBERPUNK) TurboCyan.copy(alpha = 0.3f) else Color(0x33000000)
+        scope.drawLine(
+            color = tileJointColor,
+            start = Offset(x1 - w1 - curbW1 - sidewalkW1, y1),
+            end = Offset(x1 - w1 - curbW1, y1),
+            strokeWidth = 1.5f
+        )
+        scope.drawLine(
+            color = tileJointColor,
+            start = Offset(x1 + w1 + curbW1, y1),
+            end = Offset(x1 + w1 + curbW1 + sidewalkW1, y1),
+            strokeWidth = 1.5f
+        )
+
+        // Outer Sidewalk Guardrail / Barrier (حاجز أمان جانبي للرصيف)
+        val railW1 = w1 * 0.04f
+        val railW2 = w2 * 0.04f
+        val railColor = if (isOdd) Color(0xFF94A3B8) else Color(0xFF64748B)
+
+        // Left outer guardrail
+        drawPolygon(
+            scope,
+            x1 - w1 - curbW1 - sidewalkW1 - railW1, y1,
+            x1 - w1 - curbW1 - sidewalkW1, y1,
+            x2 - w2 - curbW2 - sidewalkW2, y2,
+            x2 - w2 - curbW2 - sidewalkW2 - railW2, y2,
+            railColor
+        )
+        // Right outer guardrail
+        drawPolygon(
+            scope,
+            x1 + w1 + curbW1 + sidewalkW1, y1,
+            x1 + w1 + curbW1 + sidewalkW1 + railW1, y1,
+            x2 + w2 + curbW2 + sidewalkW2 + railW2, y2,
+            x2 + w2 + curbW2 + sidewalkW2, y2,
+            railColor
+        )
+
+        // 3. Sidewalk Curb Stones (برودورة الرصيف - حافة الرصيف البارزة ثلاثية الأبعاد)
         val curbColor = if (isOdd) mode.curbColorA else mode.curbColorB
 
         // Left curb
@@ -255,7 +456,27 @@ object Road3DRenderer {
             curbColor
         )
 
-        // 3. Road Surface
+        // 3D Curb Drop / Edge Shadow (العمق ثلاثي الأبعاد لحافة الرصيف فوق الأسفلت)
+        val curbDropW1 = curbW1 * 0.22f
+        val curbDropW2 = curbW2 * 0.22f
+        drawPolygon(
+            scope,
+            x1 - w1 - curbDropW1, y1,
+            x1 - w1, y1,
+            x2 - w2, y2,
+            x2 - w2 - curbDropW2, y2,
+            Color(0x55000000)
+        )
+        drawPolygon(
+            scope,
+            x1 + w1, y1,
+            x1 + w1 + curbDropW1, y1,
+            x2 + w2 + curbDropW2, y2,
+            x2 + w2, y2,
+            Color(0x55000000)
+        )
+
+        // 4. Main Asphalt Road Surface (الطريق الأسفلتي الرئيسي)
         val roadColor = if (seg.isFinishLine || seg.isStartLine) {
             Color(0xFFEEEEEE)
         } else if (isOdd) {
@@ -273,7 +494,31 @@ object Road3DRenderer {
             roadColor
         )
 
-        // 4. Lane markings / Checkered finish line pattern
+        // Solid White Road Boundary Edge Lines (خطوط حافة الطريق البيضاء المتصلة بجانب الرصيف)
+        val roadEdgeW1 = w1 * 0.035f
+        val roadEdgeW2 = w2 * 0.035f
+        val edgeLineColor = if (mode.theme == TrackTheme.CYBERPUNK) TurboCyan else Color(0xFFFFFFFF)
+
+        // Left white road edge
+        drawPolygon(
+            scope,
+            x1 - w1, y1,
+            x1 - w1 + roadEdgeW1, y1,
+            x2 - w2 + roadEdgeW2, y2,
+            x2 - w2, y2,
+            edgeLineColor
+        )
+        // Right white road edge
+        drawPolygon(
+            scope,
+            x1 + w1 - roadEdgeW1, y1,
+            x1 + w1, y1,
+            x2 + w2, y2,
+            x2 + w2 - roadEdgeW2, y2,
+            edgeLineColor
+        )
+
+        // 5. Road Lane Markings / Checkered Finish Line
         if (seg.isFinishLine) {
             // Draw Checkered road asphalt
             val checkCount = 8

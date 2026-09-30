@@ -30,6 +30,19 @@ class GameViewModel(
     val allRecords: StateFlow<List<RaceRecord>> = repository.allRecords
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+    val allHighScores: StateFlow<List<HighScore>> = repository.allHighScores
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val topHighScores: StateFlow<List<HighScore>> = repository.topHighScores
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val highestScore: StateFlow<Int> = repository.highestScore
+        .map { it ?: 0 }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
+
+    val playerName: StateFlow<String> = repository.playerName
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), repository.getPlayerName())
+
     val coins: StateFlow<Int> = repository.coins
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 100)
 
@@ -185,12 +198,21 @@ class GameViewModel(
             speed = max(0f, speed - 45f * dt)
         }
 
-        // Off-road slowdown
-        if (abs(playerX) > 1.0f) {
-            speed = max(30f, speed - 160f * dt)
-            cameraShake = 0.5f
+        // Road & Sidewalk handling
+        val absX = abs(playerX)
+        if (absX in 0.95f..1.35f) {
+            // Driving on Sidewalk & Curb: rumble strip camera shake and light friction
+            cameraShake = 0.3f
+            speed = max(40f, speed - 40f * dt)
             if (speed > 50f) {
-                spawnTireSmoke(playerX, 0.4f)
+                spawnTireSmoke(playerX, 0.25f)
+            }
+        } else if (absX > 1.35f) {
+            // Off sidewalk into terrain
+            speed = max(30f, speed - 160f * dt)
+            cameraShake = 0.6f
+            if (speed > 40f) {
+                spawnTireSmoke(playerX, 0.45f)
             }
         }
 
@@ -207,8 +229,8 @@ class GameViewModel(
         }
         val steerRoll = current.steerRoll + (targetRoll - current.steerRoll) * min(1f, dt * 10f)
 
-        // Keep within reasonable world bounds (-2.0 to +2.0)
-        playerX = playerX.coerceIn(-1.8f, 1.8f)
+        // Keep within reasonable world bounds including sidewalk
+        playerX = playerX.coerceIn(-1.55f, 1.55f)
 
         // 3. Movement along track
         val metersPerSec = speed * (1000f / 3600f)
@@ -310,13 +332,7 @@ class GameViewModel(
         val isWrecked = health <= 0f
 
         if (isTimeOut || isWrecked) {
-            soundManager.playCrashSound()
-            _gameState.value = current.copy(
-                status = RaceStatus.CRASHED_GAME_OVER,
-                carHealth = 0f,
-                speedKmh = 0f,
-                bannerText = if (isTimeOut) "⏳ انتهى الوقت المحدد!" else "💥 تحطمت السيارة بالكامل!"
-            )
+            handleDefeat(isTimeOut)
             return
         }
 
@@ -346,18 +362,20 @@ class GameViewModel(
         }
         val bonusCoins = (50 * mode.coinBonusMultiplier).toInt()
         val totalCoinsEarned = coins + bonusCoins
+        val car = _currentCar.value
+
+        val sessionScore = HighScore.calculateScore(
+            isVictory = true,
+            distanceCoveredMeters = mode.trackLengthMeters,
+            trackLengthMeters = mode.trackLengthMeters,
+            timeSeconds = timeElapsed,
+            maxSpeedKmh = car.topSpeedKmh,
+            coinsCollected = totalCoinsEarned,
+            stars = stars
+        )
 
         soundManager.playVictoryFanfare()
         spawnVictoryConfetti()
-
-        _gameState.value = _gameState.value.copy(
-            status = RaceStatus.VICTORY_FINISHED,
-            coinsCollected = totalCoinsEarned,
-            starsEarned = stars,
-            distanceToFinish = 0f,
-            bannerText = "🏁 خط النهاية! فوز ساحق! 🏁",
-            bannerDuration = 5f
-        )
 
         // Format time
         val minutes = (timeElapsed / 60).toInt()
@@ -365,18 +383,50 @@ class GameViewModel(
         val millis = ((timeElapsed * 10) % 10).toInt()
         val timeFormatted = String.format("%02d:%02d.%d", minutes, seconds, millis)
 
-        // Save to Room DB
         viewModelScope.launch {
+            val previousBest = repository.getHighestScoreDirect()
+            val isNewRecord = sessionScore > previousBest
+
+            // 1. Save RaceRecord to Room DB
             repository.recordRaceResult(
                 RaceRecord(
                     modeId = mode.id,
                     modeName = mode.nameAr,
                     timeSeconds = timeElapsed,
-                    maxSpeedKmh = _currentCar.value.topSpeedKmh,
+                    maxSpeedKmh = car.topSpeedKmh,
                     stars = stars,
                     coinsEarned = totalCoinsEarned,
                     isVictory = true
                 )
+            )
+
+            // 2. Save HighScore to Room DB
+            repository.saveHighScore(
+                HighScore(
+                    playerName = repository.getPlayerName(),
+                    score = sessionScore,
+                    modeId = mode.id,
+                    modeName = mode.nameAr,
+                    timeSeconds = timeElapsed,
+                    maxSpeedKmh = car.topSpeedKmh,
+                    stars = stars,
+                    coinsEarned = totalCoinsEarned,
+                    distanceCoveredMeters = mode.trackLengthMeters,
+                    isCompleted = true,
+                    carName = car.nameAr
+                )
+            )
+
+            _gameState.value = _gameState.value.copy(
+                status = RaceStatus.VICTORY_FINISHED,
+                coinsCollected = totalCoinsEarned,
+                starsEarned = stars,
+                sessionScore = sessionScore,
+                isNewHighScore = isNewRecord,
+                previousHighScore = previousBest,
+                distanceToFinish = 0f,
+                bannerText = if (isNewRecord) "🏆 سكور قياسي جديد: $sessionScore نقطة!" else "🏁 خط النهاية! فوز ساحق! 🏁",
+                bannerDuration = 5f
             )
         }
 
@@ -388,6 +438,65 @@ class GameViewModel(
             coinsEarned = totalCoinsEarned,
             stars = stars
         )
+    }
+
+    private fun handleDefeat(isTimeOut: Boolean) {
+        val current = _gameState.value
+        val car = _currentCar.value
+        val distanceTraveled = current.playerZ
+        val sessionScore = HighScore.calculateScore(
+            isVictory = false,
+            distanceCoveredMeters = distanceTraveled,
+            trackLengthMeters = current.mode.trackLengthMeters,
+            timeSeconds = current.elapsedTimeSeconds,
+            maxSpeedKmh = car.topSpeedKmh,
+            coinsCollected = current.coinsCollected,
+            stars = 0
+        )
+
+        soundManager.playCrashSound()
+
+        viewModelScope.launch {
+            val previousBest = repository.getHighestScoreDirect()
+            val isNewRecord = sessionScore > previousBest && previousBest > 0
+
+            // Save HighScore after race session even on crash/timeout
+            repository.saveHighScore(
+                HighScore(
+                    playerName = repository.getPlayerName(),
+                    score = sessionScore,
+                    modeId = current.mode.id,
+                    modeName = current.mode.nameAr,
+                    timeSeconds = current.elapsedTimeSeconds,
+                    maxSpeedKmh = car.topSpeedKmh,
+                    stars = 0,
+                    coinsEarned = current.coinsCollected,
+                    distanceCoveredMeters = distanceTraveled,
+                    isCompleted = false,
+                    carName = car.nameAr
+                )
+            )
+
+            _gameState.value = current.copy(
+                status = RaceStatus.CRASHED_GAME_OVER,
+                carHealth = 0f,
+                speedKmh = 0f,
+                sessionScore = sessionScore,
+                isNewHighScore = isNewRecord,
+                previousHighScore = previousBest,
+                bannerText = if (isTimeOut) "⏳ انتهى الوقت المحدد!" else "💥 تحطمت السيارة بالكامل!"
+            )
+        }
+    }
+
+    fun updatePlayerName(name: String) {
+        repository.setPlayerName(name)
+    }
+
+    fun clearAllScores() {
+        viewModelScope.launch {
+            repository.clearHighScoresOnly()
+        }
     }
 
     private fun updateParticles(dt: Float) {

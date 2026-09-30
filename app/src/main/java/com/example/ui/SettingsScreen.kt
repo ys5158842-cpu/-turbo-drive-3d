@@ -238,6 +238,86 @@ fun SettingsScreen(
 
             Spacer(modifier = Modifier.height(16.dp))
 
+            // Player Profile & Room Data Management Card
+            var playerNameInput by remember { mutableStateOf(repository.getPlayerName()) }
+            Card(
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(containerColor = DarkSurface),
+                border = androidx.compose.foundation.BorderStroke(1.dp, TurboGold.copy(alpha = 0.5f)),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(18.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Default.Badge,
+                            contentDescription = null,
+                            tint = TurboGold,
+                            modifier = Modifier.size(22.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "ملف المتسابق وقاعدة البيانات (Room DB)",
+                            color = TextPrimary,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 15.sp
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Text(
+                        text = "اسم المتسابق المسجل مع قائمة الأرقام القياسية:",
+                        color = TextSecondary,
+                        fontSize = 12.sp
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        OutlinedTextField(
+                            value = playerNameInput,
+                            onValueChange = { playerNameInput = it },
+                            singleLine = true,
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = TurboCyan,
+                                unfocusedBorderColor = DarkSurfaceVariant
+                            ),
+                            modifier = Modifier.weight(1f)
+                        )
+                        Button(
+                            onClick = {
+                                viewModel.updatePlayerName(playerNameInput)
+                                Toast.makeText(context, "تم حفظ اسم المتسابق بنجاح!", Toast.LENGTH_SHORT).show()
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = TurboCyan, contentColor = DarkBg)
+                        ) {
+                            Text("حفظ", fontWeight = FontWeight.Bold)
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    // Clear high scores
+                    OutlinedButton(
+                        onClick = {
+                            viewModel.clearAllScores()
+                            Toast.makeText(context, "تم تصفير سجل السكور والأرقام القياسية بنجاح!", Toast.LENGTH_SHORT).show()
+                        },
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = TurboRed),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, TurboRed.copy(alpha = 0.6f)),
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(Icons.Default.DeleteSweep, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("مسح وحذف الأرقام القياسية المخزنة (Room DB)", fontSize = 12.sp)
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
             // About Card
             Card(
                 shape = RoundedCornerShape(20.dp),

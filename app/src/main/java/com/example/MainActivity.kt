@@ -43,7 +43,7 @@ class MainActivity : ComponentActivity() {
 
         val database = AppDatabase.getDatabase(this)
         val preferences = GamePreferences(this)
-        repository = GameRepository(database.raceDao(), preferences)
+        repository = GameRepository(database.raceDao(), database.highScoreDao(), preferences)
 
         RaceNotificationHelper.createNotificationChannel(this)
 

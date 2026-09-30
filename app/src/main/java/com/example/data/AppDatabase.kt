@@ -5,9 +5,10 @@ import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
 
-@Database(entities = [RaceRecord::class], version = 1, exportSchema = false)
+@Database(entities = [RaceRecord::class, HighScore::class], version = 2, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun raceDao(): RaceDao
+    abstract fun highScoreDao(): HighScoreDao
 
     companion object {
         @Volatile

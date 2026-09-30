@@ -40,5 +40,8 @@ data class GameState(
     val notificationSent: Boolean = false,
     val bannerText: String? = null,
     val bannerDuration: Float = 0f,
-    val starsEarned: Int = 3
+    val starsEarned: Int = 3,
+    val sessionScore: Int = 0,
+    val isNewHighScore: Boolean = false,
+    val previousHighScore: Int = 0
 )

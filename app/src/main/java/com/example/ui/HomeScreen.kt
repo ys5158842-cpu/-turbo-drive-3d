@@ -49,6 +49,8 @@ fun HomeScreen(
     val coins by viewModel.coins.collectAsState()
     val currentCar by viewModel.currentCar.collectAsState()
     val records by viewModel.allRecords.collectAsState()
+    val highScores by viewModel.topHighScores.collectAsState()
+    val highestScore by viewModel.highestScore.collectAsState()
 
     val hasNotifPermission = remember(context) {
         RaceNotificationHelper.hasNotificationPermission(context)
@@ -64,6 +66,7 @@ fun HomeScreen(
         item {
             HomeTopBar(
                 coins = coins,
+                highestScore = highestScore,
                 recordsCount = records.count { it.isVictory },
                 onNavigateToRecords = onNavigateToRecords,
                 onNavigateToSettings = onNavigateToSettings,
@@ -241,10 +244,13 @@ fun HomeScreen(
         items(GameModes.allModes) { mode ->
             val bestRecord = records.filter { it.modeId == mode.id && it.isVictory }
                 .minByOrNull { it.timeSeconds }
+            val bestHighScore = highScores.filter { it.modeId == mode.id }
+                .maxByOrNull { it.score }
 
             GameModeCard(
                 mode = mode,
                 bestRecord = bestRecord,
+                bestHighScore = bestHighScore,
                 onStart = { onStartRace(mode) },
                 modifier = Modifier
                     .fillMaxWidth()
@@ -257,6 +263,7 @@ fun HomeScreen(
 @Composable
 fun HomeTopBar(
     coins: Int,
+    highestScore: Int,
     recordsCount: Int,
     onNavigateToRecords: () -> Unit,
     onNavigateToSettings: () -> Unit,
@@ -293,16 +300,45 @@ fun HomeTopBar(
             }
         }
 
-        // Coins & Actions
+        // Coins, High Score & Actions
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
+            // Highest Score Badge (Room DB)
+            if (highestScore > 0) {
+                Surface(
+                    onClick = onNavigateToRecords,
+                    color = DarkSurfaceVariant,
+                    shape = RoundedCornerShape(16.dp),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, TurboGold.copy(alpha = 0.5f))
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.EmojiEvents,
+                            contentDescription = "Best Score",
+                            tint = TurboGold,
+                            modifier = Modifier.size(15.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = "$highestScore",
+                            color = TurboGold,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 12.sp
+                        )
+                    }
+                }
+            }
+
             // Coins Badge
             Surface(
                 color = DarkSurfaceVariant,
                 shape = RoundedCornerShape(16.dp),
-                border = androidx.compose.foundation.BorderStroke(1.dp, TurboGold.copy(alpha = 0.5f))
+                border = androidx.compose.foundation.BorderStroke(1.dp, TurboCyan.copy(alpha = 0.5f))
             ) {
                 Row(
                     modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
@@ -440,6 +476,7 @@ fun ActiveCarBanner(
 fun GameModeCard(
     mode: GameMode,
     bestRecord: com.example.data.RaceRecord?,
+    bestHighScore: com.example.data.HighScore? = null,
     onStart: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -497,28 +534,41 @@ fun GameModeCard(
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // Best Record & Stars or Bonus
+            // Best Record, High Score & Stars or Bonus
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                Column {
+                    if (bestHighScore != null) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = "أعلى سكور: ${bestHighScore.score} نقطة 🏆",
+                                color = TurboGold,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+
                     if (bestRecord != null) {
                         val mins = (bestRecord.timeSeconds / 60).toInt()
                         val secs = (bestRecord.timeSeconds % 60).toInt()
-                        Text(
-                            text = "أفضل رقم: ${String.format("%02d:%02d", mins, secs)}",
-                            color = TurboGreen,
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(
-                            text = "⭐".repeat(bestRecord.stars),
-                            fontSize = 12.sp
-                        )
-                    } else {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = "أفضل زمن: ${String.format("%02d:%02d", mins, secs)}",
+                                color = TurboGreen,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = "⭐".repeat(bestRecord.stars),
+                                fontSize = 11.sp
+                            )
+                        }
+                    } else if (bestHighScore == null) {
                         Text(
                             text = "مكافأة الفوز: +${(50 * mode.coinBonusMultiplier).toInt()} عملة 🪙",
                             color = TurboGold,

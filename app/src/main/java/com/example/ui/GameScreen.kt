@@ -565,6 +565,37 @@ fun VictoryOverlay(
 
             Spacer(modifier = Modifier.height(16.dp))
 
+            // New High Score Banner
+            if (gameState.isNewHighScore) {
+                Surface(
+                    color = TurboGold.copy(alpha = 0.2f),
+                    shape = RoundedCornerShape(12.dp),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, TurboGold),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier.padding(10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.EmojiEvents,
+                            contentDescription = null,
+                            tint = TurboGold,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "🎉 سكور قياسي جديد: ${gameState.sessionScore} نقطة! 🏆",
+                            color = TurboGold,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Black
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.height(12.dp))
+            }
+
             // Notification confirmation badge
             Surface(
                 color = TurboCyanDark.copy(alpha = 0.25f),
@@ -595,13 +626,14 @@ fun VictoryOverlay(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Stats grid
+            // Stats grid with Session Score
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceEvenly
             ) {
                 val mins = (gameState.elapsedTimeSeconds / 60).toInt()
                 val secs = (gameState.elapsedTimeSeconds % 60).toInt()
+                ResultStatBadge(title = "السكور", value = "${gameState.sessionScore} 🏆")
                 ResultStatBadge(title = "الوقت", value = String.format("%02d:%02d", mins, secs))
                 ResultStatBadge(title = "العملات", value = "+${gameState.coinsCollected} 🪙")
                 ResultStatBadge(title = "السرعة", value = "${car.topSpeedKmh} كم/س")
@@ -706,7 +738,34 @@ fun DefeatOverlay(
                 textAlign = TextAlign.Center
             )
 
-            Spacer(modifier = Modifier.height(18.dp))
+            Spacer(modifier = Modifier.height(14.dp))
+
+            // Session Score earned
+            Surface(
+                color = DarkSurfaceVariant,
+                shape = RoundedCornerShape(12.dp),
+                border = androidx.compose.foundation.BorderStroke(1.dp, Color(0x33FFFFFF)),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(
+                    modifier = Modifier.padding(10.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(
+                        text = "نقاط هذه الجولة: ${gameState.sessionScore} نقطة 🪙",
+                        color = TurboGold,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 14.sp
+                    )
+                    Text(
+                        text = "تم حفظ السكور في قاعدة بيانات Room المحلية",
+                        color = TextMuted,
+                        fontSize = 10.sp
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(14.dp))
 
             Button(
                 onClick = onRetry,
